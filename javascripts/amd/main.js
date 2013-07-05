@@ -5,7 +5,7 @@
 
     // paths are relative to the aforementioned `baseUrl`
     paths: {
-      "ZeroClipboard": "ZeroClipboard_1.2.0-beta.1",
+      "ZeroClipboard": "ZeroClipboard_1.2.0-beta.2",
       "jquery":        "vendor/jquery",
       "domReady":      "vendor/requirejs-plugins/domReady"
     }
@@ -14,16 +14,8 @@
   // Define the main module
   define(["ZeroClipboard", "jquery", "domReady!"], function(ZeroClipboard, $) {
 
-    // Configure the root ZeroClipboard object for AMD
+    // Configure the root ZeroClipboard object
     ZeroClipboard.setDefaults({
-
-      // The AMD module name or path associated with the ZeroClipboard object.
-      // Could also use "../ZeroClipboard" instead (assuming the GLOBAL require's
-      // `baseUrl` configuration does not change).
-      // This MUST be set to enable support for event dispatching while using AMD!
-      //
-      // Defaults to: `null`.
-      amdModuleId: "ZeroClipboard",
 
       // The path must be relative to the PAGE, NOT to the current AMD module!
       // Or, it could be an absolute path on the domain, e.g.:
@@ -33,7 +25,7 @@
       //  - "//localhost:3000/javascripts/ZeroClipboard.swf"
       //  - "//my.awesomecdn.com/javascripts/ZeroClipboard.swf"
       //  - "http://my.awesomecdn.com/javascripts/ZeroClipboard.swf"
-      moviePath: "javascripts/amd/ZeroClipboard_1.2.0-beta.1.swf"
+      moviePath: "javascripts/amd/ZeroClipboard_1.2.0-beta.2.swf"
 
     });
 

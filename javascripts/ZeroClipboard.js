@@ -1,24 +1,42 @@
 /*!
  * zeroclipboard
- * The Zero Clipboard library provides an easy way to copy text to the clipboard using an invisible Adobe Flash movie, and a JavaScript interface.
- * Copyright 2012 Jon Rohan, James M. Greene, .
+ * The ZeroClipboard library provides an easy way to copy text to the clipboard using an invisible Adobe Flash movie, and a JavaScript interface.
+ * Copyright 2013 Jon Rohan, James M. Greene.
  * Released under the MIT license
- * http://jonrohan.github.com/ZeroClipboard/
- * v1.1.7
+ * http://zeroclipboard.github.io/ZeroClipboard/
+ * v1.2.0-beta.2
  */(function() {
   "use strict";
+  var _camelizeCssPropName = function() {
+    var matcherRegex = /\-([a-z])/g, replacerFn = function(match, group) {
+      return group.toUpperCase();
+    };
+    return function(prop) {
+      return prop.replace(matcherRegex, replacerFn);
+    };
+  }();
   var _getStyle = function(el, prop) {
-    var y = el.style[prop];
-    if (el.currentStyle) y = el.currentStyle[prop]; else if (window.getComputedStyle) y = document.defaultView.getComputedStyle(el, null).getPropertyValue(prop);
-    if (y == "auto" && prop == "cursor") {
-      var possiblePointers = [ "a" ];
-      for (var i = 0; i < possiblePointers.length; i++) {
-        if (el.tagName.toLowerCase() == possiblePointers[i]) {
+    var value, camelProp, tagName, possiblePointers, i, len;
+    if (window.getComputedStyle) {
+      value = window.getComputedStyle(el, null).getPropertyValue(prop);
+    } else {
+      camelProp = _camelizeCssPropName(prop);
+      if (el.currentStyle) {
+        value = el.currentStyle[camelProp];
+      } else {
+        value = el.style[camelProp];
+      }
+    }
+    if (value === "auto" && prop === "cursor") {
+      tagName = el.tagName.toLowerCase();
+      possiblePointers = [ "a" ];
+      for (i = 0, len = possiblePointers.length; i < len; i++) {
+        if (tagName === possiblePointers[i]) {
           return "pointer";
         }
       }
     }
-    return y;
+    return value;
   };
   var _elementMouseOver = function(event) {
     if (!ZeroClipboard.prototype._singleton) return;
@@ -99,15 +117,15 @@
       top: 0,
       width: obj.width || obj.offsetWidth || 0,
       height: obj.height || obj.offsetHeight || 0,
-      zIndex: 9999
+      zIndex: 999999999
     };
-    var zi = _getStyle(obj, "zIndex");
-    if (zi && zi != "auto") {
+    var zi = _getStyle(obj, "z-index");
+    if (zi && zi !== "auto") {
       info.zIndex = parseInt(zi, 10);
     }
     while (obj) {
-      var borderLeftWidth = parseInt(_getStyle(obj, "borderLeftWidth"), 10);
-      var borderTopWidth = parseInt(_getStyle(obj, "borderTopWidth"), 10);
+      var borderLeftWidth = parseInt(_getStyle(obj, "border-left-width"), 10);
+      var borderTopWidth = parseInt(_getStyle(obj, "border-top-width"), 10);
       info.left += isNaN(obj.offsetLeft) ? 0 : obj.offsetLeft;
       info.left += isNaN(borderLeftWidth) ? 0 : borderLeftWidth;
       info.top += isNaN(obj.offsetTop) ? 0 : obj.offsetTop;
@@ -117,16 +135,29 @@
     return info;
   };
   var _noCache = function(path) {
-    return (path.indexOf("?") >= 0 ? "&" : "?") + "nocache=" + (new Date).getTime();
+    var client = ZeroClipboard.prototype._singleton;
+    if (client.options.useNoCache) {
+      return (path.indexOf("?") >= 0 ? "&nocache=" : "?nocache=") + (new Date).getTime();
+    } else {
+      return "";
+    }
   };
   var _vars = function(options) {
     var str = [];
     if (options.trustedDomains) {
-      if (typeof options.trustedDomains === "string") {
-        str.push("trustedDomain=" + options.trustedDomains);
-      } else {
-        str.push("trustedDomain=" + options.trustedDomains.join(","));
+      var domains;
+      if (typeof options.trustedDomains === "string" && options.trustedDomains) {
+        domains = [ options.trustedDomains ];
+      } else if ("length" in options.trustedDomains) {
+        domains = options.trustedDomains;
       }
+      str.push("trustedDomain=" + encodeURIComponent(domains.join(",")));
+    }
+    if (typeof options.amdModuleId === "string" && options.amdModuleId) {
+      str.push("amdModuleId=" + encodeURIComponent(options.amdModuleId));
+    }
+    if (typeof options.cjsModuleId === "string" && options.cjsModuleId) {
+      str.push("cjsModuleId=" + encodeURIComponent(options.cjsModuleId));
     }
     return str.join("&");
   };
@@ -163,7 +194,7 @@
     if (element.getAttribute("title")) {
       this.setTitle(element.getAttribute("title"));
     }
-    this.setHandCursor(_getStyle(element, "cursor") == "pointer");
+    this.setHandCursor(_getStyle(element, "cursor") === "pointer");
   };
   ZeroClipboard.prototype.setText = function(newText) {
     if (newText && newText !== "") {
@@ -180,14 +211,15 @@
   ZeroClipboard.prototype.setHandCursor = function(enabled) {
     if (this.ready()) this.flashBridge.setHandCursor(enabled);
   };
-  ZeroClipboard.version = "1.1.7";
+  ZeroClipboard.version = "1.2.0-beta.1";
   var _defaults = {
     moviePath: "ZeroClipboard.swf",
     trustedDomains: null,
     text: null,
     hoverClass: "zeroclipboard-is-hover",
     activeClass: "zeroclipboard-is-active",
-    allowScriptAccess: "sameDomain"
+    allowScriptAccess: "sameDomain",
+    useNoCache: true
   };
   ZeroClipboard.setDefaults = function(options) {
     for (var ko in options) _defaults[ko] = options[ko];
@@ -200,22 +232,30 @@
   };
   ZeroClipboard.detectFlashSupport = function() {
     var hasFlash = false;
-    try {
-      if (new ActiveXObject("ShockwaveFlash.ShockwaveFlash")) {
-        hasFlash = true;
-      }
-    } catch (error) {
-      if (navigator.mimeTypes["application/x-shockwave-flash"]) {
-        hasFlash = true;
-      }
+    if (typeof ActiveXObject === "function") {
+      try {
+        if (new ActiveXObject("ShockwaveFlash.ShockwaveFlash")) {
+          hasFlash = true;
+        }
+      } catch (error) {}
+    }
+    if (!hasFlash && navigator.mimeTypes["application/x-shockwave-flash"]) {
+      hasFlash = true;
     }
     return hasFlash;
   };
+  var _amdModuleId = null;
+  var _cjsModuleId = null;
   var _bridge = function() {
     var client = ZeroClipboard.prototype._singleton;
     var container = document.getElementById("global-zeroclipboard-html-bridge");
     if (!container) {
-      var html = '      <object classid="clsid:d27cdb6e-ae6d-11cf-96b8-444553540000" id="global-zeroclipboard-flash-bridge" width="100%" height="100%">         <param name="movie" value="' + client.options.moviePath + _noCache(client.options.moviePath) + '"/>         <param name="allowScriptAccess" value="' + client.options.allowScriptAccess + '"/>         <param name="scale" value="exactfit"/>         <param name="loop" value="false"/>         <param name="menu" value="false"/>         <param name="quality" value="best" />         <param name="bgcolor" value="#ffffff"/>         <param name="wmode" value="transparent"/>         <param name="flashvars" value="' + _vars(client.options) + '"/>         <embed src="' + client.options.moviePath + _noCache(client.options.moviePath) + '"           loop="false" menu="false"           quality="best" bgcolor="#ffffff"           width="100%" height="100%"           name="global-zeroclipboard-flash-bridge"           allowScriptAccess="always"           allowFullScreen="false"           type="application/x-shockwave-flash"           wmode="transparent"           pluginspage="http://www.macromedia.com/go/getflashplayer"           flashvars="' + _vars(client.options) + '"           scale="exactfit">         </embed>       </object>';
+      var opts = {};
+      for (var ko in client.options) opts[ko] = client.options[ko];
+      opts.amdModuleId = _amdModuleId;
+      opts.cjsModuleId = _cjsModuleId;
+      var flashvars = _vars(opts);
+      var html = '      <object classid="clsid:d27cdb6e-ae6d-11cf-96b8-444553540000" id="global-zeroclipboard-flash-bridge" width="100%" height="100%">         <param name="movie" value="' + client.options.moviePath + _noCache(client.options.moviePath) + '"/>         <param name="allowScriptAccess" value="' + client.options.allowScriptAccess + '"/>         <param name="scale" value="exactfit"/>         <param name="loop" value="false"/>         <param name="menu" value="false"/>         <param name="quality" value="best" />         <param name="bgcolor" value="#ffffff"/>         <param name="wmode" value="transparent"/>         <param name="flashvars" value="' + flashvars + '"/>         <embed src="' + client.options.moviePath + _noCache(client.options.moviePath) + '"           loop="false" menu="false"           quality="best" bgcolor="#ffffff"           width="100%" height="100%"           name="global-zeroclipboard-flash-bridge"           allowScriptAccess="always"           allowFullScreen="false"           type="application/x-shockwave-flash"           wmode="transparent"           pluginspage="http://www.macromedia.com/go/getflashplayer"           flashvars="' + flashvars + '"           scale="exactfit">         </embed>       </object>';
       container = document.createElement("div");
       container.id = "global-zeroclipboard-html-bridge";
       container.setAttribute("class", "global-zeroclipboard-container");
@@ -347,12 +387,14 @@
       if (arrayIndex != -1) gluedElements.splice(arrayIndex, 1);
     }
   };
-  if (typeof module !== "undefined") {
-    module.exports = ZeroClipboard;
-  } else if (typeof define === "function" && define.amd) {
-    define(function() {
+  if (typeof define === "function" && define.amd) {
+    define([ "require", "exports", "module" ], function(require, exports, module) {
+      _amdModuleId = module && module.id || null;
       return ZeroClipboard;
     });
+  } else if (typeof module !== "undefined" && module) {
+    _cjsModuleId = module.id || null;
+    module.exports = ZeroClipboard;
   } else {
     window.ZeroClipboard = ZeroClipboard;
   }
